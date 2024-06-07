@@ -1,0 +1,20 @@
+#+TITLE: ob-jira
+
+~ob-jira~ provides Babel functions for Jira JQL evaluation.
+
+It uses the [[https://github.com/ankitpokhrel/jira-cli][JiraCLI]] program for communication with Jira.
+
+* Limitations
+
+Some parts of JQL is not supported, for example ~ORDER BY~ clauses. There are instead block parameters that can control ordering and such.
+
+I'm not sure how much of this is quirks of JiraCLI as opposed to the Jira API. It could be that if I use this a lot it would be worth forking or submitting improvements to JiraCLI, or switch to using ~jiralib.el~ from [[https://github.com/ahungry/org-jira][org-jira]].
+
+* TODOs
+
+- Clean up error messages in case of invalid queries.
+- Loop and call command multiple times when output overflows the maximum page size. Alternately this could be a function contributed to the CLI program.
+- Inject boiler plate ~project IS NOT EMPTY~ to make queries get results from multiple projects, unless ~:project~ is set.
+- Interpret ~ORDER BY~ and such from queries and convert into parameters, to allow more of the query to be written as actual JQL.
+- Document the parameters to JQL code blocks.
+- Add support for ~:var~ variables. JQL doesn't actually support them, but it would be very useful, so will do it by using the "function" style syntax it uses for things like ~currentUser()~.
