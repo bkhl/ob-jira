@@ -37,9 +37,12 @@
   "Execute a Jira JQL query with Babel."
   (let ((args (org-babel-jira--args body params)))
     (with-temp-buffer
-      (apply #'call-process org-babel-jira-command nil t nil
-             "--paginate" (format "%d:%d" 0 (alist-get :limit params 100))
-             args)
+      (let ((result (apply #'call-process org-babel-jira-command nil t nil
+                           "--paginate" (format "%d:%d"
+                                                0 (alist-get :limit params 100))
+                           args)))
+        (when (not (eq result 0))
+          (error "error from %s: %s" org-babel-jira-command (buffer-string))))
       (buffer-string))))
 
 (defun org-babel-jira--args (body params)
