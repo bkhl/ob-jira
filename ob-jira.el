@@ -33,21 +33,38 @@
   :group 'org-babel
   :type 'string)
 
+(defcustom org-babel-jira-page-size 100
+  "Number of results to fetch in each call to JiraCLI.
+It is limited by JiraCLI to 100."
+  :group 'org-babel
+  :type 'string)
+
 (defun org-babel-execute:jql (body params)
   "Execute a Jira JQL query with Babel."
   (let ((args (org-babel-jira--args body params)))
     (with-temp-buffer
-      (let ((result (apply #'call-process org-babel-jira-command nil t nil
-                           "issue" "list" "--plain" "--no-headers"
-                           "--paginate" (format "%d:%d"
-                                                0 (alist-get :limit params 100))
-                           args)))
-        (when (not (eq result 0))
-          (error "error from %s: %s" org-babel-jira-command (buffer-string))))
+      (org-babel-jira--execute args 0 (alist-get :limit params))
       (buffer-string))))
 
+(defun org-babel-jira--execute (args start limit)
+  (let* ((point-start (point))
+         (next-start (+ start org-babel-jira-page-size))
+         (page-size (if limit
+                        (min org-babel-jira-page-size (- limit start))
+                      org-babel-jira-page-size))
+         (result (apply #'call-process org-babel-jira-command nil t nil
+                        `(,@args
+                          "--paginate" ,(format "%d:%d" start page-size)))))
+    (cond ((not (eq result 0)) (error "error from %s: %s"
+                                      org-babel-jira-command
+                                      (buffer-substring point-start (point-max))))
+          ((and limit (< limit (line-number-at-pos (point)))))
+          ((< (line-number-at-pos (point)) next-start))
+          (t (org-babel-jira--execute args next-start limit)))))
+
 (defun org-babel-jira--args (body params)
-  `(,@(org-babel-jira--string-args
+  `("issue" "list" "--plain" "--no-headers"
+    ,@(org-babel-jira--string-args
        params
        '((:config-file-path "--config")
          (:project "--project")

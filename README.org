@@ -12,7 +12,6 @@ I'm not sure how much of this is quirks of JiraCLI as opposed to the Jira API. I
 
 * TODOs
 
-- Loop and call command multiple times when output overflows the maximum page size. Alternately this could be a function contributed to the CLI program.
 - Inject boiler plate ~project IS NOT EMPTY~ to make queries get results from multiple projects, unless ~:project~ is set.
 - Interpret ~ORDER BY~ and such from queries and convert into parameters, to allow more of the query to be written as actual JQL.
 - Document the parameters to JQL code blocks.
