@@ -38,6 +38,7 @@
   (let ((args (org-babel-jira--args body params)))
     (with-temp-buffer
       (let ((result (apply #'call-process org-babel-jira-command nil t nil
+                           "issue" "list" "--plain" "--no-headers"
                            "--paginate" (format "%d:%d"
                                                 0 (alist-get :limit params 100))
                            args)))
@@ -46,8 +47,7 @@
       (buffer-string))))
 
 (defun org-babel-jira--args (body params)
-  `("issue" "list" "--plain" "--no-headers"
-    ,@(org-babel-jira--string-args
+  `(,@(org-babel-jira--string-args
        params
        '((:config-file-path "--config")
          (:project "--project")
@@ -74,37 +74,35 @@
        params
        '((:history "--history")
          (:watching "--watching")))
-    ,@(let ((case-fold-search t))
-        (pcase (alist-get :order params "ascending")
-          ((rx (seq bos (or "+" "asc" "ascending") eos)) nil)
-          ((rx (seq bos (or "-" "desc" "descending") eos)) '("--reverse"))
-          (value (message "invalid order value: %s" value))))
-
+    ,@(let ((order (alist-get :order params "ascending")))
+        (cond ((member-ignore-case order '("+" "asc" "ascending")) '("--reverse"))
+              ((member-ignore-case order '("-" "desc" "descending")) nil)
+              (t (error "invalid order value: %s" order))))
     "--jql" ,(org-babel-expand-body:generic body params)))
 
 (defun org-babel-jira--string-args (params args)
   (mapcan (lambda (arg)
-            (pcase-let ((`(,key ,flag ,default) arg))
+            (seq-let (key flag default) arg
               (when-let ((value (alist-get key params default)))
                 `(,flag ,value))))
           args))
 
 (defun org-babel-jira--boolean-args (params args)
   (mapcan (lambda (arg)
-            (pcase-let ((`(,key ,flag) arg))
+            (seq-let (key flag) arg
               (let ((value (alist-get key params)))
-                (cond ((string= value "t") flag)
-                      ((or (string= value "nil") (eq value nil)) nil)
+                (cond ((string= value "t") `(,flag))
+                      ((string= value "nil") nil)
                       (t (error "invalid %s value: %s" key value))))))
           args))
 
 (defun org-babel-jira--string-array-args (params args)
   (mapcan (lambda (arg)
-            (pcase-let ((`(,key ,flag) arg))
+            (seq-let (key flag) arg
               (when-let ((values (alist-get key params)))
                 (mapcan (lambda (value)
                           `(,flag ,value))
-                        (split-string values (rx (or "," whitespace)) t)))))
+                        (split-string values "," t (rx (one-or-more whitespace)))))))
           args))
 
 (provide 'ob-jira)
