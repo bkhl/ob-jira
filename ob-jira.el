@@ -28,6 +28,8 @@
 
 ;;; Code:
 
+(require 'ob)
+
 (defcustom org-babel-jira-command "jira"
   "Name of command to use for executing JiraCLI (https://github.com/ankitpokhrel/jira-cli)."
   :group 'org-babel
@@ -95,7 +97,7 @@ It is limited by JiraCLI to 100."
         (cond ((member-ignore-case order '("+" "asc" "ascending")) '("--reverse"))
               ((member-ignore-case order '("-" "desc" "descending")) nil)
               (t (error "invalid order value: %s" order))))
-    "--jql" ,(org-babel-expand-body:generic body params)))
+    "--jql" ,(org-babel-expand-body:jql body params)))
 
 (defun org-babel-jira--string-args (params args)
   (mapcan (lambda (arg)
@@ -121,6 +123,22 @@ It is limited by JiraCLI to 100."
                           `(,flag ,value))
                         (split-string values "," t (rx (one-or-more whitespace)))))))
           args))
+
+(defun org-babel-expand-body:jql (body params)
+  (org-babel-expand-body:generic
+   (org-babel-jira--expand-vars body (org-babel--get-vars params))
+   params))
+
+(defun org-babel-jira--expand-vars (body vars)
+  (with-temp-buffer
+    (insert body)
+    (goto-char (point-min))
+    (let ((case-fold-search t))
+      (while (re-search-forward (rx bow (group (group (one-or-more alpha)) eow "()"))
+                                nil t)
+        (when-let ((value (alist-get (intern (match-string 2)) vars)))
+          (replace-match value t t nil 1))))
+    (buffer-string)))
 
 (provide 'ob-jira)
 

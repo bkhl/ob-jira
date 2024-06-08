@@ -4,6 +4,83 @@
 
 It uses the [[https://github.com/ankitpokhrel/jira-cli][JiraCLI]] program for communication with Jira.
 
+* Configuration
+
+See [[https://github.com/ankitpokhrel/jira-cli][JiraCLI]] page for instructions on how to install the program and configure it to authenticate to your Jira instance.
+
+It should be sufficient to load the package to enable it, but the offical way to enable a language for Babel is like this:
+
+#+begin_src emacs-lisp
+(org-babel-do-load-languages 'org-babel-load-languages
+                             '((emacs-lisp . t)
+                               (jira . t)))
+#+end_src
+
+This would enable Babel for Emacs Lisp and JQL source code blocks.
+
+* Parameters
+
+Corresponding JiraCLI command line flags are in parenthesis. Unless otherwise given, the default is whatever is the default for JiraCLI.
+
+- ~:config-file-path~ :: (~--config~)Alternative JiraCLI config file
+- ~:project~ :: (~--project~) Jira project
+- ~:type~ :: (~--type~) Type :: (Bug, Task, &c.)
+- ~:resolution~ :: (~--resolution~)
+- ~:status~ :: (~--status~)
+- ~:priority~ :: (~--priority~)
+- ~:reporter~ :: (~--reporter~)
+- ~:assignee~ :: (~--assignee~)
+- ~:component~ :: (~--component~)
+- ~:label~ :: (~--label~) Comma separated labels
+- ~:parent~ :: (~--parent~)
+- ~:history~ :: (~--history~)
+- ~:watching~ :: (~--watching~)
+- ~:created~ :: (~--created~)
+- ~:updated~ :: (~--updated~)
+- ~:created-after~ :: (~--created-after~)
+- ~:updated-after~ :: (~--updated-after~)
+- ~:created-before~ :: (~--created-before~)
+- ~:updated-before~ :: (~--updated-before~)
+- ~:order-by~ :: (~--order-by~) default: ~rank~
+- ~:columns~ :: (~--columns~)
+- ~:order~ :: (~--reverse~) Order, either ~+/asc/ascending~ or ~-/desc/descending~, defaults to ~ascending~. The default amounts to using the ~--reverse~ commandline flag for JiraCLI.
+
+* Examples
+
+Basic query with some parameters provided.
+
+#+begin_src jql :columns KEY,SUMMARY :order ascending
+assignee = currentUser() AND status != Closed
+#+end_src
+
+#+RESULTS:
+#+begin_example
+ABC-14392	Missing input validation
+ABC-43891	Add calculator
+#+end_example
+
+Variables can be used as "functions" in the JQL.
+
+#+NAME: xyz_tasks
+#+begin_src jql :project XYZ :columns KEY,SUMMARY :order ascending :var user="bkhl"
+assignee = user() AND status != Closed
+#+end_src
+
+#+RESULTS:
+#+begin_example
+XYZ-23035	Clicking play does nothing
+XYZ-41894	Write user manual
+#+end_example
+
+This way, you can also reuse queries as using calls:
+
+#+CALL: xyz_tasks(user="bob")
+
+#+RESULTS:
+#+begin_example
+XYZ-41243	Prepare release party
+#+end_example
+
 * Limitations
 
 Some parts of JQL is not supported, for example ~ORDER BY~ clauses. There are instead block parameters that can control ordering and such.
@@ -14,5 +91,4 @@ I'm not sure how much of this is quirks of JiraCLI as opposed to the Jira API. I
 
 - Inject boiler plate ~project IS NOT EMPTY~ to make queries get results from multiple projects, unless ~:project~ is set.
 - Interpret ~ORDER BY~ and such from queries and convert into parameters, to allow more of the query to be written as actual JQL.
-- Document the parameters to JQL code blocks.
-- Add support for ~:var~ variables. JQL doesn't actually support them, but it would be very useful, so will do it by using the "function" style syntax it uses for things like ~currentUser()~.
+- Support saving results as tables.
