@@ -41,15 +41,15 @@ Corresponding JiraCLI command line flags are in parenthesis. Unless otherwise gi
 - ~:updated-after~ :: (~--updated-after~)
 - ~:created-before~ :: (~--created-before~)
 - ~:updated-before~ :: (~--updated-before~)
-- ~:order-by~ :: (~--order-by~) default: ~rank~
 - ~:columns~ :: (~--columns~)
-- ~:order~ :: (~--reverse~) Order, either ~+/asc/ascending~ or ~-/desc/descending~, defaults to ~ascending~. The default amounts to using the ~--reverse~ commandline flag for JiraCLI.
+- ~:order-by~ :: (~--order-by~) Comma separated list of fields to order by. (default: ~rank~)
+- ~:order~ :: (~--reverse~) Order, either ~+/asc/ascending~ or ~-/desc/descending~, defaults to ~ascending~. The default amounts to using the ~--reverse~ commandline flag for JiraCLI. When using multiple keys to order by, the reversing only applies to the last key in the list.
 
 * Examples
 
 Basic query with some parameters provided.
 
-#+begin_src jql :columns KEY,SUMMARY :order ascending
+#+begin_src jql :columns key,summary :order ascending
 assignee = currentUser() AND status != Closed
 #+end_src
 
@@ -62,7 +62,7 @@ ABC-43891	Add calculator
 Variables can be used as "functions" in the JQL.
 
 #+NAME: xyz_tasks
-#+begin_src jql :project XYZ :columns KEY,SUMMARY :order ascending :var user="bkhl"
+#+begin_src jql :project XYZ :columns key,summary :order ascending :var user="bkhl"
 assignee = user() AND status != Closed
 #+end_src
 
@@ -83,11 +83,8 @@ XYZ-41243	Prepare release party
 
 * Limitations
 
-Some parts of JQL is not supported, for example ~ORDER BY~ clauses. There are instead block parameters that can control ordering and such.
-
-I'm not sure how much of this is quirks of JiraCLI as opposed to the Jira API. It could be that if I use this a lot it would be worth forking or submitting improvements to JiraCLI, or switch to using ~jiralib.el~ from [[https://github.com/ahungry/org-jira][org-jira]].
+The JiraCLI tool does not support ~ORDER BY~ clauses so those are converted into ~--order-by~ and ~--reverse~ command line flags as needed. This means you can not use different ~ASC~ or ~DESC~ descriptions on individual keys in the sorting. You can add ~ASC~ or ~DESC~ at the end of the ~ORDER BY~ clause, but this will only affect the ordering of the final key.
 
 * TODOs
 
-- Interpret ~ORDER BY~ and such from queries and convert into parameters, to allow more of the query to be written as actual JQL.
 - Support saving results as tables.

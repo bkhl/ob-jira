@@ -43,7 +43,8 @@ It is limited by JiraCLI to 100."
 
 (defun org-babel-execute:jql (body params)
   "Execute a Jira JQL query with Babel."
-  (let ((args (org-babel-jira--args body params)))
+  (let* ((body (org-babel-expand-body:jql body params))
+         (args (org-babel-jira--args body params)))
     (with-temp-buffer
       (org-babel-jira--execute args 0 (alist-get :limit params))
       (buffer-string))))
@@ -98,11 +99,10 @@ It is limited by JiraCLI to 100."
                       (upcase
                        (alist-get :columns params "TYPE,KEY,SUMMARY,STATUS")))))
         (when columns `("--columns" ,(string-join columns ","))))
-    ,@(let ((order (alist-get :order params "ascending")))
-        (cond ((member-ignore-case order '("+" "asc" "ascending")) '("--reverse"))
-              ((member-ignore-case order '("-" "desc" "descending")) nil)
-              (t (error "invalid order value: %s" order))))
-    "--jql" ,(org-babel-expand-body:jql body params)))
+    ,@(let ((order (org-babel-jira--normalize-order (alist-get :order params "ascending"))))
+        (when (string= "ASC" order)
+          '("--reverse")))
+    "--jql" ,body))
 
 (defun org-babel-jira--string-args (params args)
   (mapcan (lambda (arg)
@@ -130,8 +130,10 @@ It is limited by JiraCLI to 100."
           args))
 
 (defun org-babel-expand-body:jql (body params)
-  (let* ((body (org-babel-jira--expand-vars body (org-babel--get-vars params)))
+  (let* ((body (string-trim body))
+         (body (org-babel-jira--expand-vars body (org-babel--get-vars params)))
          (body (org-babel-jira--expand-project body (alist-get :project params)))
+         (body (org-babel-jira--expand-order body params))
          (body (org-babel-expand-body:generic body params)))
     body))
 
@@ -140,7 +142,10 @@ It is limited by JiraCLI to 100."
     (insert body)
     (goto-char (point-min))
     (let ((case-fold-search t))
-      (while (re-search-forward (rx bow (group (group (one-or-more alpha)) eow "()"))
+      (while (re-search-forward (rx word-start (group-n 1
+                                                 (group-n 2
+                                                   (one-or-more alpha))
+                                                 word-end "()"))
                                 nil t)
         (when-let ((value (alist-get (intern (match-string 2)) vars)))
           (replace-match value t t nil 1))))
@@ -153,6 +158,65 @@ It is limited by JiraCLI to 100."
                      (string-join projects ", ")
                      body))
           (t body))))
+
+(defun org-babel-jira--parse-order-clause (body)
+  (when (let ((case-fold-search t))
+          (string-match (rx bos
+                            (group-n 1
+                              (zero-or-more any))
+                            (one-or-more space)
+                            "order" (one-or-more space)
+                            "by" (one-or-more space)
+                            (group-n 2
+                              (zero-or-more (one-or-more alpha)
+                                            (zero-or-more space)
+                                            ","
+                                            (zero-or-more space))
+                              (one-or-more alpha))
+                            (one-or-more space)
+                            (group-n 3 (or "asc" "desc"))
+                            (zero-or-more space)
+                            eos)
+                        body))
+    `((:rest . ,(match-string 1 body))
+      (:keys . ,(match-string 2 body))
+      (:order . ,(match-string 3 body)))))
+
+(defun org-babel-jira--expand-order (body params)
+  "Parse any ORDER BY clause. Will modify `params' in place to apply ordering,
+or throw errors if the clause is inconsistent with the corresponding parameters.
+The return value is `body' with the ORDER BY clause removed."
+  (if-let ((match (org-babel-jira--parse-order-clause body)))
+      (let ((rest (string-trim (alist-get :rest match)))
+            (clause-keys (string-join
+                          (org-babel-jira--split-param (alist-get :keys match))
+                          ","))
+            (clause-order (upcase (alist-get :order match)))
+            (param-keys (when-let ((param (alist-get :order-by params)))
+                          (unless (string= "nil" param)
+                            (string-join (org-babel-jira--split-param param) ","))))
+            (param-order (when-let ((param (alist-get :order params)))
+                           (unless (string= "nil" param)
+                             (org-babel-jira--normalize-order param)))))
+        (if param-keys
+            (unless (string-equal-ignore-case clause-keys param-keys)
+              (error ":order-by value %S in conflict with ORDER BY keys %S"
+                     param-keys
+                     clause-keys))
+          (push '(:order-by . clause-keys) params))
+        (if param-order
+            (unless (string= clause-order param-order)
+              (error ":order value %S is in conflict with ORDER BY clause"
+                     param-keys
+                     clause-keys))
+          (push '(:order . clause-order) params))
+        rest)
+    body))
+
+(defun org-babel-jira--normalize-order (order)
+  (cond ((member-ignore-case order '("+" "asc" "ascending")) "ASC")
+        ((member-ignore-case order '("-" "desc" "descending")) "DESC")
+        (t (error "invalid order value: %s" order))))
 
 (defun org-babel-jira--split-param (param)
   (unless (string= param "nil")
