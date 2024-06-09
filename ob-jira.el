@@ -69,7 +69,6 @@ It is limited by JiraCLI to 100."
     ,@(org-babel-jira--string-args
        params
        '((:config-file-path "--config")
-         (:project "--project")
          (:type "--type")
          (:resolution "--resolution")
          (:priority "--priority")
@@ -93,6 +92,9 @@ It is limited by JiraCLI to 100."
        params
        '((:history "--history")
          (:watching "--watching")))
+    ,@(let ((projects (org-babel-jira--split-param (alist-get :project params))))
+        (when (eq 1 (length projects))
+          `("--project" ,(car projects))))
     ,@(let ((order (alist-get :order params "ascending")))
         (cond ((member-ignore-case order '("+" "asc" "ascending")) '("--reverse"))
               ((member-ignore-case order '("-" "desc" "descending")) nil)
@@ -121,13 +123,14 @@ It is limited by JiraCLI to 100."
               (when-let ((values (alist-get key params)))
                 (mapcan (lambda (value)
                           `(,flag ,value))
-                        (split-string values "," t (rx (one-or-more whitespace)))))))
+                        (org-babel-jira--split-param values)))))
           args))
 
 (defun org-babel-expand-body:jql (body params)
-  (org-babel-expand-body:generic
-   (org-babel-jira--expand-vars body (org-babel--get-vars params))
-   params))
+  (let* ((body (org-babel-jira--expand-vars body (org-babel--get-vars params)))
+         (body (org-babel-jira--expand-project body (alist-get :project params)))
+         (body (org-babel-expand-body:generic body params)))
+    body))
 
 (defun org-babel-jira--expand-vars (body vars)
   (with-temp-buffer
@@ -139,6 +142,18 @@ It is limited by JiraCLI to 100."
         (when-let ((value (alist-get (intern (match-string 2)) vars)))
           (replace-match value t t nil 1))))
     (buffer-string)))
+
+(defun org-babel-jira--expand-project (body project)
+  (let ((projects (org-babel-jira--split-param project)))
+    (cond ((not projects) (format "project IS NOT EMPTY AND (%s)" body))
+          ((< 1 (length projects)) (format "project IN (%s) AND (%s)"
+                     (string-join projects ", ")
+                     body))
+          (t body))))
+
+(defun org-babel-jira--split-param (param)
+  (unless (string= param "nil")
+    (split-string param "," t (rx (one-or-more whitespace)))))
 
 (provide 'ob-jira)
 

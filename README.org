@@ -22,8 +22,8 @@ This would enable Babel for Emacs Lisp and JQL source code blocks.
 
 Corresponding JiraCLI command line flags are in parenthesis. Unless otherwise given, the default is whatever is the default for JiraCLI.
 
-- ~:config-file-path~ :: (~--config~)Alternative JiraCLI config file
-- ~:project~ :: (~--project~) Jira project
+- ~:config-file-path~ :: (~--config~) Alternative JiraCLI config file
+- ~:project~ :: (~--project~) Comma separated lists of Jira projects. If not project is given the whole query will be wrapped in ~project IS NOT EMPTY AND (…)~, since that is what you have to do with JiraCLI to query across all projects. If there are more than one, it will be wrapped in ~project IN (…) AND (…)~. In other words the ~--project~ command line flag will only be used if there is a single project given as the parameter.
 - ~:type~ :: (~--type~) Type :: (Bug, Task, &c.)
 - ~:resolution~ :: (~--resolution~)
 - ~:status~ :: (~--status~)
@@ -89,6 +89,5 @@ I'm not sure how much of this is quirks of JiraCLI as opposed to the Jira API. I
 
 * TODOs
 
-- Inject boiler plate ~project IS NOT EMPTY~ to make queries get results from multiple projects, unless ~:project~ is set.
 - Interpret ~ORDER BY~ and such from queries and convert into parameters, to allow more of the query to be written as actual JQL.
 - Support saving results as tables.
