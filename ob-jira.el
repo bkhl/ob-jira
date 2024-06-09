@@ -57,9 +57,9 @@ It is limited by JiraCLI to 100."
          (result (apply #'call-process org-babel-jira-command nil t nil
                         `(,@args
                           "--paginate" ,(format "%d:%d" start page-size)))))
-    (cond ((not (eq result 0)) (error "error from %s: %s"
-                                      org-babel-jira-command
-                                      (buffer-substring point-start (point-max))))
+    (cond ((not (eq result 0)) (error "error from %S:\n%s"
+                                      `(,org-babel-jira-command . ,args)
+                                      (string-trim (buffer-substring point-start (point-max)))))
           ((and limit (< limit (line-number-at-pos (point)))))
           ((< (line-number-at-pos (point)) next-start))
           (t (org-babel-jira--execute args next-start limit)))))
