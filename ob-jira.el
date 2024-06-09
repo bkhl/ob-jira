@@ -82,8 +82,7 @@ It is limited by JiraCLI to 100."
          (:updated-after "--updated-after")
          (:created-before "--created-before")
          (:updated-before "--updated-before")
-         (:order-by "--order-by" "rank")
-         (:columns "--columns" "TYPE,KEY,SUMMARY,STATUS")))
+         (:order-by "--order-by" "rank")))
     ,@(org-babel-jira--string-array-args
        params
        '((:status "--status")
@@ -95,6 +94,10 @@ It is limited by JiraCLI to 100."
     ,@(let ((projects (org-babel-jira--split-param (alist-get :project params))))
         (when (eq 1 (length projects))
           `("--project" ,(car projects))))
+    ,@(let ((columns (org-babel-jira--split-param
+                      (upcase
+                       (alist-get :columns params "TYPE,KEY,SUMMARY,STATUS")))))
+        (when columns `("--columns" ,(string-join columns ","))))
     ,@(let ((order (alist-get :order params "ascending")))
         (cond ((member-ignore-case order '("+" "asc" "ascending")) '("--reverse"))
               ((member-ignore-case order '("-" "desc" "descending")) nil)
