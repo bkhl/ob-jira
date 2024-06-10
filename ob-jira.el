@@ -43,11 +43,11 @@ It is limited by JiraCLI to 100."
 
 (defun org-babel-execute:jql (body params)
   "Execute a Jira JQL query with Babel."
-  (let* ((body (org-babel-expand-body:jql body params))
-         (args (org-babel-jira--args body params)))
-    (with-temp-buffer
-      (org-babel-jira--execute args 0 (alist-get :limit params))
-      (buffer-string))))
+  (seq-let (body params) (org-babel-jira--expand-body body params)
+    (let ((args (org-babel-jira--args body params)))
+      (with-temp-buffer
+        (org-babel-jira--execute args 0 (alist-get :limit params))
+        (buffer-string)))))
 
 (defun org-babel-jira--execute (args start limit)
   (let* ((point-start (point))
@@ -130,13 +130,13 @@ It is limited by JiraCLI to 100."
                         (org-babel-jira--split-param values)))))
           args))
 
-(defun org-babel-expand-body:jql (body params)
+(defun org-babel-jira--expand-body (body params)
   (let* ((body (string-trim body))
-         (body (org-babel-jira--expand-vars body (org-babel--get-vars params)))
-         (body (org-babel-jira--expand-project body (alist-get :project params)))
-         (body (org-babel-jira--expand-order body params))
-         (body (org-babel-expand-body:generic body params)))
-    body))
+         (body (org-babel-jira--expand-vars body (org-babel--get-vars params))))
+    (seq-let (body params) (org-babel-jira--expand-order body params)
+      (let* ((body (org-babel-jira--expand-project body (alist-get :project params)))
+             (body (org-babel-expand-body:generic body params)))
+        `(,body ,params)))))
 
 (defun org-babel-jira--expand-vars (body vars)
   (with-temp-buffer
@@ -187,9 +187,9 @@ It is limited by JiraCLI to 100."
       (:order . ,(match-string 3 body)))))
 
 (defun org-babel-jira--expand-order (body params)
-  "Parse any ORDER BY clause. Will modify `params' in place to apply ordering,
-or throw errors if the clause is inconsistent with the corresponding parameters.
-The return value is `body' with the ORDER BY clause removed."
+  "Parse any ORDER BY clause. Will modify `params' to apply ordering, or throw
+errors if the clause is inconsistent with the corresponding parameters. The
+return value is `body' with the ORDER BY clause removed."
   (if-let ((match (org-babel-jira--parse-order-clause body)))
       (let ((rest (string-trim (alist-get :rest match)))
             (clause-keys (string-join
@@ -207,15 +207,15 @@ The return value is `body' with the ORDER BY clause removed."
               (error ":order-by value %S in conflict with ORDER BY keys %S"
                      param-keys
                      clause-keys))
-          (push '(:order-by . clause-keys) params))
+          (push `(:order-by . ,clause-keys) params))
         (if param-order
             (unless (string= clause-order param-order)
               (error ":order value %S is in conflict with ORDER BY clause"
                      param-keys
                      clause-keys))
-          (push '(:order . clause-order) params))
-        rest)
-    body))
+          (push `(:order . ,clause-order) params))
+        `(,rest ,params))
+    `(,body ,params)))
 
 (defun org-babel-jira--normalize-order (order)
   (cond ((member-ignore-case order '("+" "asc" "ascending")) "ASC")
