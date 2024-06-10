@@ -102,7 +102,8 @@ It is limited by JiraCLI to 100."
     ,@(let ((order (org-babel-jira--normalize-order (alist-get :order params "ascending"))))
         (when (string= "ASC" order)
           '("--reverse")))
-    "--jql" ,body))
+    ,@(unless (string= "" body)
+        `("--jql" ,body))))
 
 (defun org-babel-jira--string-args (params args)
   (mapcan (lambda (arg)
@@ -153,11 +154,14 @@ It is limited by JiraCLI to 100."
 
 (defun org-babel-jira--expand-project (body project)
   (let ((projects (org-babel-jira--split-param project)))
-    (cond ((not projects) (format "project IS NOT EMPTY AND (%s)" body))
-          ((< 1 (length projects)) (format "project IN (%s) AND (%s)"
-                     (string-join projects ", ")
-                     body))
-          (t body))))
+    (if (= 1 (length projects))
+        body
+      (string-join `(,(if projects
+                          (format "project IN (%s)"
+                                  (string-join projects ", "))
+                        "project IS NOT EMPTY")
+                     . ,(unless (string= "" body) `(,(format "(%s)" body))))
+                   " AND "))))
 
 (defun org-babel-jira--parse-order-clause (body)
   (when (let ((case-fold-search t))
