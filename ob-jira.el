@@ -58,7 +58,7 @@ It is limited by JiraCLI to 100."
          (result (apply #'call-process org-babel-jira-command nil t nil
                         `(,@args
                           "--paginate" ,(format "%d:%d" start page-size)))))
-    (cond ((not (eq result 0)) (error "error from %S:\n%s"
+    (cond ((not (and (numberp result) (= result 0))) (error "error from %S:\n%s"
                                       `(,org-babel-jira-command . ,args)
                                       (string-trim (buffer-substring point-start (point-max)))))
           ((and limit (< limit (line-number-at-pos (point)))))
@@ -93,7 +93,7 @@ It is limited by JiraCLI to 100."
        '((:history "--history")
          (:watching "--watching")))
     ,@(let ((projects (org-babel-jira--split-param (alist-get :project params))))
-        (when (eq 1 (length projects))
+        (when (= 1 (length projects))
           `("--project" ,(car projects))))
     ,@(let ((columns (org-babel-jira--split-param
                       (upcase
