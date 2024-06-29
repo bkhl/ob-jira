@@ -22,64 +22,70 @@ This would enable Babel for Emacs Lisp and JQL source code blocks.
 
 Corresponding JiraCLI command line flags are in parenthesis. Unless otherwise given, the default is whatever is the default for JiraCLI.
 
-- ~:config-file-path~ :: (~--config~) Alternative JiraCLI config file
-- ~:project~ :: (~--project~) Comma separated lists of Jira projects. If not project is given the whole query will be wrapped in ~project IS NOT EMPTY AND (…)~, since that is what you have to do with JiraCLI to query across all projects. If there are more than one, it will be wrapped in ~project IN (…) AND (…)~. In other words the ~--project~ command line flag will only be used if there is a single project given as the parameter.
-- ~:type~ :: (~--type~) Type :: (Bug, Task, &c.)
-- ~:resolution~ :: (~--resolution~)
-- ~:status~ :: (~--status~)
-- ~:priority~ :: (~--priority~)
-- ~:reporter~ :: (~--reporter~)
-- ~:assignee~ :: (~--assignee~)
-- ~:component~ :: (~--component~)
-- ~:label~ :: (~--label~) Comma separated labels
-- ~:parent~ :: (~--parent~)
-- ~:history~ :: (~--history~)
-- ~:watching~ :: (~--watching~)
-- ~:created~ :: (~--created~)
-- ~:updated~ :: (~--updated~)
-- ~:created-after~ :: (~--created-after~)
-- ~:updated-after~ :: (~--updated-after~)
-- ~:created-before~ :: (~--created-before~)
-- ~:updated-before~ :: (~--updated-before~)
-- ~:columns~ :: (~--columns~)
-- ~:order-by~ :: (~--order-by~) Comma separated list of fields to order by. (default: ~rank~)
-- ~:order~ :: (~--reverse~) Order, either ~+/asc/ascending~ or ~-/desc/descending~, defaults to ~ascending~. The default amounts to using the ~--reverse~ commandline flag for JiraCLI. When using multiple keys to order by, the reversing only applies to the last key in the list.
+- ~:config-file-path~ :: ~--config~: Alternative JiraCLI config file
+- ~:project~ :: ~--project~: Comma separated lists of Jira projects. If not project is given the whole query will be wrapped in ~project IS NOT EMPTY AND (…)~, since that is what you have to do with JiraCLI to query across all projects. If there are more than one, it will be wrapped in ~project IN (…) AND (…)~. In other words the ~--project~ command line flag will only be used if there is a single project given as the parameter.
+- ~:type~ :: ~--type~: Type :: (Bug, Task, &c.)
+- ~:resolution~ :: ~--resolution~
+- ~:status~ :: ~--status~
+- ~:priority~ :: ~--priority~
+- ~:reporter~ :: ~--reporter~
+- ~:assignee~ :: ~--assignee~
+- ~:component~ :: ~--component~
+- ~:label~ :: ~--label~: Comma separated labels
+- ~:parent~ :: ~--parent~
+- ~:history~ :: ~--history~
+- ~:watching~ :: ~--watching~
+- ~:created~ :: ~--created~
+- ~:updated~ :: ~--updated~
+- ~:created-after~ :: ~--created-after~
+- ~:updated-after~ :: ~--updated-after~
+- ~:created-before~ :: ~--created-before~
+- ~:updated-before~ :: ~--updated-before~
+- ~:columns~ :: ~--columns~
+- ~:order-by~ :: ~--order-by~: Comma separated list of fields to order by. (default: ~rank~)
+- ~:order~ :: ~--reverse~: Order, either ~+/asc/ascending~ or ~-/desc/descending~, defaults to ~ascending~. The default amounts to using the ~--reverse~ commandline flag for JiraCLI. When using multiple keys to order by, the reversing only applies to the last key in the list.
 
 * Examples
 
 Basic query with some parameters provided.
 
-#+begin_src jql :columns key,summary :order ascending
+#+begin_src org
+,#+begin_src jql :columns key,summary :order ascending
 assignee = currentUser() AND status != Closed
-#+end_src
+,#+end_src
 
-#+RESULTS:
-#+begin_example
+,#+RESULTS:
+,#+begin_example
 ABC-14392	Missing input validation
 ABC-43891	Add calculator
-#+end_example
+,#+end_example
+#+end_src
 
 Variables can be used as "functions" in the JQL.
 
-#+NAME: xyz_tasks
-#+begin_src jql :project XYZ :columns key,summary :order ascending :var user="bkhl"
+#+begin_src org
+,#+NAME: xyz_tasks
+,#+begin_src jql :project XYZ :columns key,summary :order ascending :var user="bkhl"
 assignee = user() AND status != Closed
-#+end_src
+,#+end_src
 
-#+RESULTS:
-#+begin_example
+,#+RESULTS:
+,#+begin_example
 XYZ-23035	Clicking play does nothing
 XYZ-41894	Write user manual
-#+end_example
+,#+end_example
+#+end_src
 
 This way, you can also reuse queries as using calls:
 
-#+CALL: xyz_tasks(user="bob")
+#+begin_src org
+,#+CALL: xyz_tasks(user="bob")
 
-#+RESULTS:
-#+begin_example
+,#+RESULTS:
+,#+begin_example
 XYZ-41243	Prepare release party
-#+end_example
+,#+end_example
+#+end_src
 
 * Limitations
 

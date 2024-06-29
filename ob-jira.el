@@ -4,8 +4,9 @@
 
 ;; Author: Björn Lindström
 ;; URL: https://git.sr.ht/~bkhl/ob-jira
-;; Package-Requires: ((emacs "26.1"))
-;; Keywords: literate programming
+;; Version: 0.1
+;; Package-Requires: ((emacs "29.1"))
+;; Keywords: literate programming, outlines, comm
 
 ;; This file is part of GNU Emacs.
 
@@ -30,44 +31,57 @@
 
 (require 'ob)
 
-(defcustom org-babel-jira-command "jira"
+(defcustom ob-jira-command "jira"
   "Name of command to use for executing JiraCLI (https://github.com/ankitpokhrel/jira-cli)."
   :group 'org-babel
   :type 'string)
 
-(defcustom org-babel-jira-page-size 100
+(defcustom ob-jira-page-size 100
   "Number of results to fetch in each call to JiraCLI.
 It is limited by JiraCLI to 100."
   :group 'org-babel
   :type 'string)
 
 (defun org-babel-execute:jql (body params)
-  "Execute a Jira JQL query with Babel."
-  (seq-let (body params) (org-babel-jira--expand-body body params)
-    (let ((args (org-babel-jira--args body params)))
+  "Execute a Jira JQL query with Babel.
+
+BODY is the content of the source block, i.e. the JQL query.
+
+PARAMS are settings from the source block headers."
+  (seq-let (body params) (ob-jira--expand-body body params)
+    (let ((args (ob-jira--args body params)))
       (with-temp-buffer
-        (org-babel-jira--execute args 0 (alist-get :limit params))
+        (ob-jira--execute args 0 (alist-get :limit params))
         (buffer-string)))))
 
-(defun org-babel-jira--execute (args start limit)
+(defun ob-jira--execute (args start limit)
+  "Execute JiraCLI with arguments.
+
+ARGS are the command line arguments.  START is the index of the first result to
+produce, and LIMIT is the maximum number of results to produce.  The output of
+the command is written to the current buffer.  This function is called
+recursively if LIMIT exceeds `ob-jira-page-size'."
   (let* ((point-start (point))
-         (next-start (+ start org-babel-jira-page-size))
+         (next-start (+ start ob-jira-page-size))
          (page-size (if limit
-                        (min org-babel-jira-page-size (- limit start))
-                      org-babel-jira-page-size))
-         (result (apply #'call-process org-babel-jira-command nil t nil
+                        (min ob-jira-page-size (- limit start))
+                      ob-jira-page-size))
+         (result (apply #'call-process ob-jira-command nil t nil
                         `(,@args
                           "--paginate" ,(format "%d:%d" start page-size)))))
     (cond ((not (and (numberp result) (= result 0))) (error "error from %S:\n%s"
-                                      `(,org-babel-jira-command . ,args)
+                                      `(,ob-jira-command . ,args)
                                       (string-trim (buffer-substring point-start (point-max)))))
           ((and limit (< limit (line-number-at-pos (point)))))
           ((< (line-number-at-pos (point)) next-start))
-          (t (org-babel-jira--execute args next-start limit)))))
+          (t (ob-jira--execute args next-start limit)))))
 
-(defun org-babel-jira--args (body params)
+(defun ob-jira--args (body params)
+  "Convert block into JiraCLI command line arguments.
+
+BODY is the JQL query, and PARAMS are the parameters set on the source block."
   `("issue" "list" "--plain" "--no-headers"
-    ,@(org-babel-jira--string-args
+    ,@(ob-jira--string-args
        params
        '((:config-file-path "--config")
          (:type "--type")
@@ -84,61 +98,82 @@ It is limited by JiraCLI to 100."
          (:created-before "--created-before")
          (:updated-before "--updated-before")
          (:order-by "--order-by" "rank")))
-    ,@(org-babel-jira--string-array-args
+    ,@(ob-jira--string-array-args
        params
        '((:status "--status")
          (:label "--label")))
-    ,@(org-babel-jira--boolean-args
+    ,@(ob-jira--boolean-args
        params
        '((:history "--history")
          (:watching "--watching")))
-    ,@(let ((projects (org-babel-jira--split-param (alist-get :project params))))
+    ,@(let ((projects (ob-jira--split-param (alist-get :project params))))
         (when (= 1 (length projects))
           `("--project" ,(car projects))))
-    ,@(let ((columns (org-babel-jira--split-param
+    ,@(let ((columns (ob-jira--split-param
                       (upcase
                        (alist-get :columns params "TYPE,KEY,SUMMARY,STATUS")))))
         (when columns `("--columns" ,(string-join columns ","))))
-    ,@(let ((order (org-babel-jira--normalize-order (alist-get :order params "ascending"))))
+    ,@(let ((order (ob-jira--normalize-order (alist-get :order params "ascending"))))
         (when (string= "ASC" order)
           '("--reverse")))
     ,@(unless (string= "" body)
         `("--jql" ,body))))
 
-(defun org-babel-jira--string-args (params args)
+(defun ob-jira--string-args (params args)
+  "Processs string type arguments.
+
+PARAMS are the parameters provided for the source block, and ARGS is a property
+list of parameters and their corresponding JiraCLI command line flag."
   (mapcan (lambda (arg)
             (seq-let (key flag default) arg
               (when-let ((value (alist-get key params default)))
                 `(,flag ,value))))
           args))
 
-(defun org-babel-jira--boolean-args (params args)
+(defun ob-jira--boolean-args (params args)
+  "Process boolean type arguments.
+
+PARAMS are the parameters provided for the source block, and ARGS is a property
+list of parameters and their corresponding JiraCLI command line flag."
   (mapcan (lambda (arg)
             (seq-let (key flag) arg
               (let ((value (alist-get key params)))
                 (cond ((string= value "t") `(,flag))
                       ((string= value "nil") nil)
-                      (t (error "invalid %s value: %s" key value))))))
+                      (t (error "Invalid %s value: %s" key value))))))
           args))
 
-(defun org-babel-jira--string-array-args (params args)
+(defun ob-jira--string-array-args (params args)
+  "Process string array type arguments.
+
+PARAMS are the parameters provided for the source block, and ARGS is a property
+list of parameters and their corresponding JiraCLI command line flag."
   (mapcan (lambda (arg)
             (seq-let (key flag) arg
               (when-let ((values (alist-get key params)))
                 (mapcan (lambda (value)
                           `(,flag ,value))
-                        (org-babel-jira--split-param values)))))
+                        (ob-jira--split-param values)))))
           args))
 
-(defun org-babel-jira--expand-body (body params)
+(defun ob-jira--expand-body (body params)
+  "Helper function to expand JQL query.
+
+BODY is the JQL query and PARAMS any source block parameters set.  This function
+calls other functions that perform various parts of the expansion process."
   (let* ((body (string-trim body))
-         (body (org-babel-jira--expand-vars body (org-babel--get-vars params))))
-    (seq-let (body params) (org-babel-jira--expand-order body params)
-      (let* ((body (org-babel-jira--expand-project body (alist-get :project params)))
+         (body (ob-jira--expand-vars body (org-babel--get-vars params))))
+    (seq-let (body params) (ob-jira--expand-order body params)
+      (let* ((body (ob-jira--expand-project body (alist-get :project params)))
              (body (org-babel-expand-body:generic body params)))
         `(,body ,params)))))
 
-(defun org-babel-jira--expand-vars (body vars)
+(defun ob-jira--expand-vars (body vars)
+  "Expand variables in query.
+
+BODY is the JQL query.  If VARS is provided, it will contain variables from
+block parameters to be expanded.  They should appear as function calls in the
+query, since that is the closest thing to variables present in JQL."
   (with-temp-buffer
     (insert body)
     (goto-char (point-min))
@@ -152,8 +187,21 @@ It is limited by JiraCLI to 100."
           (replace-match value t t nil 1))))
     (buffer-string)))
 
-(defun org-babel-jira--expand-project (body project)
-  (let ((projects (org-babel-jira--split-param project)))
+(defun ob-jira--expand-project (body project)
+  "Modify query to apply :project parameter.
+
+BODY is the JQL query from the source block.
+
+PROJECT is the value of any :project parameters.  If is not provided, modify
+query to include `project IS NOT EMPTY', which is how in JiraCLI you can list
+tickets from all projects.
+
+Otherwise if the parameter contains multiple projects, modify the query
+accordingly.
+
+If there is only one project the query is left unmodified, since we can in that
+case use the `--project' command line parameter to JiraCLI instead."
+  (let ((projects (ob-jira--split-param project)))
     (if (= 1 (length projects))
         body
       (string-join `(,(if projects
@@ -163,7 +211,8 @@ It is limited by JiraCLI to 100."
                      . ,(unless (string= "" body) `(,(format "(%s)" body))))
                    " AND "))))
 
-(defun org-babel-jira--parse-order-clause (body)
+(defun ob-jira--parse-order-clause (body)
+  "Parse out ORDER clause from BODY, if present."
   (when (let ((case-fold-search t))
           (string-match (rx bos
                             (group-n 1
@@ -186,22 +235,24 @@ It is limited by JiraCLI to 100."
       (:keys . ,(match-string 2 body))
       (:order . ,(match-string 3 body)))))
 
-(defun org-babel-jira--expand-order (body params)
-  "Parse any ORDER BY clause. Will modify `params' to apply ordering, or throw
-errors if the clause is inconsistent with the corresponding parameters. The
-return value is `body' with the ORDER BY clause removed."
-  (if-let ((match (org-babel-jira--parse-order-clause body)))
+(defun ob-jira--expand-order (body params)
+  "Parse any ORDER BY clause.
+
+Will modify PARAMS to apply ordering, or throw errors if the clause is
+inconsistent with the corresponding parameters.  The return value is BODY with
+the ORDER BY clause removed."
+  (if-let ((match (ob-jira--parse-order-clause body)))
       (let ((rest (string-trim (alist-get :rest match)))
             (clause-keys (string-join
-                          (org-babel-jira--split-param (alist-get :keys match))
+                          (ob-jira--split-param (alist-get :keys match))
                           ","))
             (clause-order (upcase (alist-get :order match)))
             (param-keys (when-let ((param (alist-get :order-by params)))
                           (unless (string= "nil" param)
-                            (string-join (org-babel-jira--split-param param) ","))))
+                            (string-join (ob-jira--split-param param) ","))))
             (param-order (when-let ((param (alist-get :order params)))
                            (unless (string= "nil" param)
-                             (org-babel-jira--normalize-order param)))))
+                             (ob-jira--normalize-order param)))))
         (if param-keys
             (unless (string-equal-ignore-case clause-keys param-keys)
               (error ":order-by value %S in conflict with ORDER BY keys %S"
@@ -217,12 +268,16 @@ return value is `body' with the ORDER BY clause removed."
         `(,rest ,params))
     `(,body ,params)))
 
-(defun org-babel-jira--normalize-order (order)
+(defun ob-jira--normalize-order (order)
+  "ORDER is a value set for the :order parameter.
+
+Normalize it into ASC or DESC."
   (cond ((member-ignore-case order '("+" "asc" "ascending")) "ASC")
         ((member-ignore-case order '("-" "desc" "descending")) "DESC")
-        (t (error "invalid order value: %s" order))))
+        (t (error "Invalid order value: %s" order))))
 
-(defun org-babel-jira--split-param (param)
+(defun ob-jira--split-param (param)
+  "Split comma-separated PARAM values into a list of values."
   (unless (string= param "nil")
     (split-string param "," t (rx (one-or-more whitespace)))))
 
